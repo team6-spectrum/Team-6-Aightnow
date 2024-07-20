@@ -50,24 +50,6 @@ export async function realtimeApi(code: string) {
   }
 }
 
-// 기업 정보 및 종목 정보
-export async function basicApi(code: string) {
-  try {
-    const response = await fetch(
-      `https://api.stock.naver.com/stock/${codes[code]}/basic`,
-    );
-
-    if (!response.ok) {
-      throw new Error(response.statusText);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("error:", error);
-  }
-}
-
 // 분석평점 / 목표주가 / 산업비교정보
 export async function integrationApi(code: string) {
   try {
@@ -101,63 +83,5 @@ export async function calcPriceApi() {
     return data.result.calcPrice;
   } catch (error) {
     console.error("error:", error);
-  }
-}
-
-// 종목 최신 뉴스 리스트
-export async function stockLatestNewsListApi(code: string) {
-  try {
-    const response = await fetch(
-      `https://api.stock.naver.com/news/worldStock/${codes[code]}?pageSize=10&page=1`,
-    );
-
-    if (!response.ok) {
-      throw new Error(response.statusText);
-    }
-
-    const data = await response.json();
-
-    const aidData = data.map((item: any) => item.aid);
-
-    return aidData;
-  } catch (error) {
-    console.error("error:", error);
-  }
-}
-
-// 종목 최신 뉴스 내용
-export async function stockLatestNewsContentApi(code: string, aids: string[]) {
-  try {
-    const fetchPromises = aids.map(async (aid) => {
-      const response = await fetch(
-        `https://api.stock.naver.com/news/worldNews/stock/fnGuide/${aid}?reutersCode=${codes[code]}`,
-      );
-
-      if (!response.ok) {
-        throw new Error(response.statusText);
-      }
-
-      return response.json();
-    });
-
-    const news = await Promise.all(fetchPromises);
-
-    const result = news.map((item, index) => {
-      // HTML 문자열
-      let htmlString = item.article.content;
-
-      // HTML 태그를 제거하고 텍스트만 추출
-      let textContent = htmlString
-        .replace(/<\/?[^>]+>/g, "") // HTML 태그 제거
-        .replace(/\n+/g, " ") // 줄바꿈을 공백으로 변경
-        .trim(); // 앞뒤 공백 제거
-
-      return { [`news${index}`]: textContent };
-    });
-
-    return result;
-  } catch (error) {
-    console.error("error:", error);
-    throw error;
   }
 }

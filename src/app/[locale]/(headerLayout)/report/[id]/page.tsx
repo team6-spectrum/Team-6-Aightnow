@@ -1,5 +1,4 @@
 import ReportContainer from "@/containers/report/ReportContainer";
-import promptGenerator from "@/libs/prompts/promptGenerator";
 import {
   realtimeApi,
   integrationApi,
@@ -43,9 +42,6 @@ export default async function Page({ params }: TParams) {
     stockPriceData,
     id.toUpperCase(),
   );
-
-  const promptResult = await promptGenerator(id);
-  // console.log("!!!!!", promptResult);
 
   return (
     <>
