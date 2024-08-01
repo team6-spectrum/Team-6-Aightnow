@@ -41,21 +41,23 @@ const ChatBot: React.FC<ChatBotProps> = ({ onClose, lang }) => {
   }, [lang, setLanguage]);
 
   function handleMessageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setMessage(e.target.value);
+    setMessage(e.target.value.slice(0, 100));
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!message.trim()) return;
-    await sendMessage(message);
-    setMessage("");
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
+    
+    const isStockCode = /^[A-Za-z0-9]{1,5}$/.test(trimmedMessage);
+    
+    if (isStockCode || trimmedMessage.length >= 2) {
+      await sendMessage(trimmedMessage);
+      setMessage("");
+    } else {
+      alert(t("invalidInputMessage"));
+    }
   }
-
-  // 주가 차트 데이터 준비
-  const chartData =
-    stockData?.priceChartData?.find(
-      (d: any) => d.periodType === "month&range=3",
-    )?.priceInfo || [];
 
   return (
     <div className="fixed bottom-0 right-0 w-[480px] h-[640px] bg-white shadow-chatbot rounded-t-3xl overflow-hidden flex flex-col">
@@ -78,43 +80,41 @@ const ChatBot: React.FC<ChatBotProps> = ({ onClose, lang }) => {
               <User key={index} content={chat.content} />
             ) : (
               <Bot key={index}>
-                {chat.content === "generatingResponse" ? (
-                  <div className="animate-pulse">{t("generatingResponse")}</div>
-                ) : (
-                  t(chat.content, chat.translationParams)
-                )}
-                {chat.stockInfo && (
-                  <div className="mt-2 p-3 bg-gray-100 rounded-lg">
-                    <h3 className="font-bold">
-                      {t("stockInfo", { symbol: chat.stockInfo.symbol })}
-                    </h3>
-                    <p>
-                      {t("currentPrice")}: ${chat.stockInfo.currentPrice}
-                    </p>
-                    <p
-                      className={
-                        chat.stockInfo.priceChange >= 0
-                          ? "text-red-500"
-                          : "text-blue-500"
-                      }
-                    >
-                      {t("change")}: {chat.stockInfo.priceChange} (
-                      {chat.stockInfo.percentChange}%)
-                    </p>
-                    <p>
-                      {t("targetPrice")}: ${chat.stockInfo.targetPrice}
-                    </p>
-                    <p>
-                      {t("analystOpinion")}: {t(chat.stockInfo.analystOpinion)}
-                    </p>
-                  </div>
-                )}
+                <div>
+                  {chat.content === "generatingResponse" ? (
+                    <div className="animate-pulse">{t("generatingResponse")}</div>
+                  ) : chat.content.startsWith("오류:") ? (
+                    <div className="text-red-500">{chat.content}</div>
+                  ) : (
+                    <div>{t(chat.content, chat.translationParams)}</div>
+                  )}
+                  {chat.stockInfo && (
+                    <div className="mt-2 p-3 bg-gray-100 rounded-lg">
+                      <h3 className="font-bold">
+                        {t("stockInfo", { symbol: chat.stockInfo.symbol })}
+                      </h3>
+                      <div>
+                        {t("currentPrice")}: ${chat.stockInfo.currentPrice}
+                      </div>
+                      <div
+                        className={
+                          chat.stockInfo.priceChange >= 0
+                            ? "text-red-500"
+                            : "text-blue-500"
+                        }
+                      >
+                        {t("change")}: {chat.stockInfo.priceChange} (
+                        {chat.stockInfo.percentChange}%)
+                      </div>
+                    </div>
+                  )}
+                </div>
               </Bot>
-            ),
+            )
           )}
           {isLoading &&
             !chatHistory[chatHistory.length - 1]?.content.includes(
-              "generatingResponse",
+              "generatingResponse"
             ) && (
               <Bot>
                 <div className="animate-pulse">{t("generatingResponse")}</div>
@@ -123,6 +123,7 @@ const ChatBot: React.FC<ChatBotProps> = ({ onClose, lang }) => {
           <div ref={chatEndRef} />
         </div>
       </div>
+
 
       <form
         onSubmit={handleSubmit}

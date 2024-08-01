@@ -1,5 +1,3 @@
-// @/utils/rateLimit.ts
-
 import { NextRequest } from "next/server";
 import { firestore } from "@/firebase/firebasedb";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";

@@ -13,7 +13,7 @@ const Bot: React.FC<BotProps> = ({ children }) => {
         </div>
       </div>
       <div className="p-2 bg-gray-200 rounded-lg max-w-xs">
-        <p className="text-sm">{children}</p>
+        <div className="text-sm">{children}</div>
       </div>
     </div>
   );
