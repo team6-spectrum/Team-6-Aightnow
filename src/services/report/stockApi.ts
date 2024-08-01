@@ -1,9 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 type TCodes = {
-  [key: string]: string; // index signature
+  [key: string]: string;
 };
 
+// 주식 심볼과 API에서 사용하는 코드 매핑
 const codes: TCodes = {
   AAPL: "AAPL.O",
   TSLA: "TSLA.O",
@@ -14,66 +17,71 @@ const codes: TCodes = {
   NVDA: "NVDA.O",
 };
 
-// 주식 코드 검증 함수
-function getValidStockCode(code: string): string {
-  const lowerCode = code.toLowerCase();
-  const stockCode = codes[code] || codes[lowerCode];
+// 주식 코드 검증 및 변환 함수
+export async function getValidStockCode(code: string): Promise<string> {
+  // 주식 코드를 대문자로 변환하고 공백을 제거
+  const cleanCode = code.toUpperCase().trim();
+  
+  // codes 객체에서 매핑된 코드
+  const apiCode = codes[cleanCode];
 
-  if (!stockCode) {
-    throw new Error(`Invalid stock code: ${code}`);
+  // 매핑된 코드가 있으면 그 코드를 반환하고, 없으면 원래 코드를 반환
+  if (apiCode) {
+    console.log(`주식 코드 ${cleanCode}가 ${apiCode}로 변환되었습니다.`);
+    return apiCode;
   }
 
-  return stockCode;
+  // 주식 코드가 1-5자리의 알파벳과 숫자로만 구성되어 있는지 확인
+  if (/^[A-Z0-9]{1,5}$/.test(cleanCode)) {
+    console.log(`주식 코드 ${cleanCode}가 그대로 사용됩니다.`);
+    return cleanCode;
+  }
+  
+  throw new Error(`유효하지 않은 주식 코드입니다: ${code}`);
 }
 
-// 실시간 기반 데이터
 export async function realtimeApi(code: string) {
   try {
-    const stockCode = getValidStockCode(code);
+    const stockCode = await getValidStockCode(code);
 
-    const response = await fetch(
-      `https://polling.finance.naver.com/api/realtime/worldstock/stock/${stockCode}`,
-    );
+    // API URL을 콘솔에 출력하여 확인
+    const apiUrl = `https://polling.finance.naver.com/api/realtime/worldstock/stock/${stockCode}`;
+    console.log("데이터를 가져오는 URL:", apiUrl);
+
+    const response = await fetch(apiUrl);
 
     if (!response.ok) {
-      throw new Error(response.statusText);
+      throw new Error(`API 요청 실패: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    
+    // API 응답 로깅
+    console.log("API 응답:", JSON.stringify(data, null, 2));
 
     if (!data.datas || data.datas.length === 0) {
-      throw new Error("No data returned from API");
+      throw new Error(`주식 코드에 해당하는 데이터가 없습니다: ${stockCode}`);
     }
 
-    const {
-      reutersCode,
-      stockName,
-      symbolCode,
-      closePrice,
-      compareToPreviousClosePrice,
-      fluctuationsRatio,
-      stockExchangeType,
-    } = data.datas[0];
+    const stockData = data.datas[0];
 
-    return {
-      reutersCode,
-      stockName,
-      symbolCode,
-      closePrice,
-      compareToPreviousClosePrice,
-      fluctuationsRatio,
-      stockExchangeType: stockExchangeType.name,
-    };
-  } catch (error) {
-    console.error("realtimeApi error:", error);
-    throw error;
+    revalidatePath('/');
+    return stockData;
+
+  } catch (error: unknown) {
+    console.error("realtimeApi 오류:", error);
+    if (error instanceof Error) {
+      throw new Error(`주식 데이터 조회 실패 (${code}): ${error.message}`);
+    } else {
+      throw new Error(`주식 데이터 조회 실패 (${code}): 알 수 없는 오류`);
+    }
   }
 }
 
-// 기업 정보 및 종목 정보
+
 export async function basicApi(code: string): Promise<string> {
   try {
-    const stockCode = getValidStockCode(code);
+    const stockCode = await getValidStockCode(code);
 
     const response = await fetch(
       `https://api.stock.naver.com/stock/${stockCode}/basic`,
@@ -94,6 +102,7 @@ export async function basicApi(code: string): Promise<string> {
       stockItemTotalInfos: data.stockItemTotalInfos,
     };
 
+    revalidatePath('/');
     return JSON.stringify(stockData);
   } catch (error) {
     console.error("basicApi error:", error);
@@ -101,10 +110,9 @@ export async function basicApi(code: string): Promise<string> {
   }
 }
 
-// 분석평점 / 목표주가 / 산업비교정보
 export async function integrationApi(code: string) {
   try {
-    const stockCode = getValidStockCode(code);
+    const stockCode = await getValidStockCode(code);
 
     const response = await fetch(
       `https://api.stock.naver.com/stock/${stockCode}/integration`,
@@ -115,6 +123,7 @@ export async function integrationApi(code: string) {
     }
 
     const data = await response.json();
+    revalidatePath('/');
     return data.corporateOverview;
   } catch (error) {
     console.error("integrationApi error:", error);
@@ -122,7 +131,6 @@ export async function integrationApi(code: string) {
   }
 }
 
-// 환율
 export async function calcPriceApi() {
   try {
     const response = await fetch(
@@ -139,6 +147,7 @@ export async function calcPriceApi() {
       throw new Error("No exchange rate data returned from API");
     }
 
+    revalidatePath('/');
     return data.result.calcPrice;
   } catch (error) {
     console.error("calcPriceApi error:", error);
@@ -146,10 +155,9 @@ export async function calcPriceApi() {
   }
 }
 
-// 종목 최신 뉴스 리스트
 export async function stockLatestNewsListApi(code: string) {
   try {
-    const stockCode = getValidStockCode(code);
+    const stockCode = await getValidStockCode(code);
 
     const response = await fetch(
       `https://api.stock.naver.com/news/worldStock/${stockCode}?pageSize=3&page=1`,
@@ -167,6 +175,7 @@ export async function stockLatestNewsListApi(code: string) {
 
     const aidData = data.map((item: any) => item.aid);
 
+    revalidatePath('/');
     return aidData;
   } catch (error) {
     console.error("stockLatestNewsListApi error:", error);
@@ -174,13 +183,12 @@ export async function stockLatestNewsListApi(code: string) {
   }
 }
 
-// 종목 최신 뉴스 내용
 export async function stockLatestNewsContentApi(
   code: string,
   aids: string[],
 ): Promise<string> {
   try {
-    const stockCode = getValidStockCode(code);
+    const stockCode = await getValidStockCode(code);
 
     const fetchPromises = aids.map(async (aid) => {
       const response = await fetch(
@@ -199,19 +207,18 @@ export async function stockLatestNewsContentApi(
     const result = news.map((item) => {
       let date = item.article.dt;
 
-      // HTML 문자열
       let htmlString = item.article.content;
 
-      // HTML 태그를 제거하고 텍스트만 추출
       let textContent = htmlString
-        .replace(/<\/?[^>]+>/g, "") // HTML 태그 제거
-        .replace(/\n+/g, " ") // 줄바꿈을 공백으로 변경
+        .replace(/<\/?[^>]+>/g, "")
+        .replace(/\n+/g, " ")
         .replace(/&amp;/g, "&")
-        .trim(); // 앞뒤 공백 제거
+        .trim();
 
       return { [date]: textContent };
     });
 
+    revalidatePath('/');
     return JSON.stringify(result);
   } catch (error) {
     console.error("stockLatestNewsContentApi error:", error);

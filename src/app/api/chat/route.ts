@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const API_ENDPOINT = "https://api.together.xyz/v1/chat/completions";
-const API_KEY = process.env.TOGETHER_AI_API_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_TOGETHER_AI_API_KEY;
 
 interface ApiRequestBody {
   messages: { role: string; content: string }[];
@@ -16,6 +16,7 @@ interface ApiResponseBody {
 }
 
 export async function POST(req: NextRequest) {
+  // API 키 검증
   if (!API_KEY) {
     console.error("API 키가 설정되지 않았습니다.");
     return NextResponse.json(
@@ -26,7 +27,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const { messages }: ApiRequestBody = await req.json();
-    console.log("요청 메시지:", JSON.stringify(messages, null, 2));
+    
+    // 로깅: 요청 메시지 (민감한 정보는 제외)
+    console.log("요청 메시지:", messages.map(m => ({ role: m.role, contentLength: m.content.length })));
 
     const response = await fetch(API_ENDPOINT, {
       method: "POST",
@@ -52,7 +55,12 @@ export async function POST(req: NextRequest) {
     }
 
     const data: ApiResponseBody = await response.json();
-    console.log("API 응답:", JSON.stringify(data, null, 2));
+    
+    // 로깅: API 응답 (민감한 정보는 제외)
+    console.log("API 응답:", {
+      choicesLength: data.choices?.length,
+      firstMessageContentLength: data.choices?.[0]?.message?.content?.length
+    });
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
       console.error("유효하지 않은 API 응답:", JSON.stringify(data, null, 2));
